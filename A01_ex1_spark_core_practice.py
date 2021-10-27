@@ -59,35 +59,13 @@ def process_line(line):
     # 4. We return res
     return res
 
-def filter_function(para,north,
-            east,
-            south,
-            west,hours_list):
 
-   
-    mylist = para.split(",")
-
-    if(not(south<=float(mylist[5])<=north and west<=float(mylist[4])<=east)):
-        return False
-        
-    d = datetime.datetime.strptime(mylist[0], "%Y-%m-%d %H:%M:%S")    
-    if(d.weekday()>4 or f'{d.hour:02}' not in hours_list):         
-        return False
-
+def filter_weekday_data(timestamp_str, hours_list)->bool:
+    recorded_time = datetime.datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")   
+    if(recorded_time.weekday()>4 or f'{recorded_time.hour:02}' not in hours_list):         
+        return False 
     return True
-    
-def generate_data(para):
-    mylist = para.split(",")
-    congestion = mylist[3]
-    return (datetime.datetime.strptime(mylist[0], "%Y-%m-%d %H:%M:%S").strftime('%H'),int(congestion))
-
-def my_final_fun(para):
-    hrs = para[0]
-    congestion = list(para[1])
-    cong_count= congestion.count(1)
-    
-    percentage = round((cong_count/len(congestion))*100,2)
-    return (hrs,percentage,len(congestion),cong_count)
+ 
 
 # ------------------------------------------
 # FUNCTION my_main
@@ -104,28 +82,28 @@ def my_main(sc,
     # 1. Operation C1: 'textFile'
     inputRDD = sc.textFile(my_dataset_dir)
 
-    f1RDD = inputRDD.filter(lambda x:filter_function(x,north,
-            east,
-            south,
-            west,hours_list))
-    
-    #f2RDD = f1RDD.map(generate_data)
-    f2RDD = f1RDD.map(lambda x: (datetime.datetime.strptime(x.split(",")[0], "%Y-%m-%d %H:%M:%S").strftime('%H'),int(x.split(",")[3])))
+    rawRDD =inputRDD.map(process_line)
 
-    f3RDD = f2RDD.groupByKey()
-    f4RDD = f3RDD.sortByKey()
-                 
-
-    f5RDD = f4RDD.map(my_final_fun)
     # ---------------------------------------
     # TO BE COMPLETED
     # ---------------------------------------
     #filter should be based on weekdays,time,latitude,longitudte range
-
+    f1RDD = rawRDD.filter(lambda row:south<=row[5]<=north and west<=row[4]<=east)\
+                  .filter(lambda row:filter_weekday_data(row[0],hours_list))
     # ---------------------------------------
+    f2RDD = f1RDD.map(lambda row: (datetime.datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S").strftime('%H'),row[3]))\
+                 .groupByKey()\
+                 .sortByKey(ascending=False)   
+
+    f3RDD = f2RDD.map(lambda row:(row[0],list(row[1])))
     
+    solutionRDD = f3RDD.map(lambda row: \
+                            (row[0], \
+                            round((row[1].count(1)/len(row[1]))*100,2),\
+                            len(row[1]),row[1].count(1)))
+
     # Operation A1: 'collect'
-    resVAL = f5RDD.collect()
+    resVAL = solutionRDD.collect()
     for item in resVAL:
         print(item)
 
