@@ -86,31 +86,42 @@ def my_main(sc,
     # 1. Operation C1: 'textFile'
     inputRDD = sc.textFile(my_dataset_dir)
 
+    
+
     # ---------------------------------------
     # TO BE COMPLETED
     # ---------------------------------------
-    f1RDD = inputRDD.filter(lambda x:filter_function(x,current_time,seconds_horizon))
+    star_time = datetime.datetime.strptime(current_time, "%Y-%m-%d %H:%M:%S")
+    cutoff_time = star_time + datetime.timedelta(seconds=seconds_horizon)
 
-    f2RDD = f1RDD.map(lambda x: (int(x.split(",")[8]),int(x.split(",")[7])))
-
-    f3RDD = f2RDD.groupByKey()\
-                 .map(lambda x:(x[0],sorted(list(set(x[1])))))\
-                 .sortByKey()
-
-    f3RDD.persist()
-
-    f4RDD = f3RDD.map(lambda y: (len(y[1]),(y[0],y[1])))\
-                 .groupByKey()               
+    rowRDD = inputRDD.map(process_line)
     
-    f5RDD = f4RDD.keys()
-    keys_list = f5RDD.collect()
+    busStoppedRDD = rowRDD.filter(lambda row:row[9]==1)\
+                          .map(lambda row:(datetime.datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S"),row[8],row[7]))                           
 
+    finalfilteredRDD = busStoppedRDD.filter(lambda row:star_time<=row[0]<=cutoff_time) 
+
+    busstopVechileRDD = finalfilteredRDD.map(lambda row:(row[1],row[2]))
+
+    busstopgroupedRDD = busstopVechileRDD.groupByKey()\
+                                         .map(lambda row:(row[0],sorted(list(set(row[1])))))
+
+
+    busstopgroupedRDD.persist()
+
+    lenRDD = busstopgroupedRDD.map(lambda row:len(row[1]))
+                             
+    max_len = lenRDD.max()
+
+    solutionRDD = busstopgroupedRDD.filter(lambda row: len(row[1]) == max_len)
+
+   
      
     # ---------------------------------------
-    f6RDD = f3RDD.filter(lambda x: len(x[1])==max(keys_list))
     
     # Operation A1: 'collect'
-    resVAL = f6RDD.collect()
+    print(solutionRDD)
+    resVAL = solutionRDD.collect()
     for item in resVAL:
         print(item)
 
@@ -140,15 +151,15 @@ if __name__ == '__main__':
     my_local_path = "../../../../3_Code_Examples/L07-23_Spark_Environment/"
     my_databricks_path = "/"
 
-    my_dataset_dir = "C:/gyani/Msc/BigData/A01_Datasets/my_dataset_complete/"
-    #my_dataset_dir = "C:/gyani/Msc/BigData/A01_Datasets/A01_ex3_micro_dataset_1/"
+    my_dataset_dir = "A01_Datasets/my_dataset_complete/"
+    #my_dataset_dir = "A01_Datasets/A01_ex3_micro_dataset_1/"
     #my_dataset_dir = "C:/gyani/Msc/BigData/A01_Datasets/A01_ex3_micro_dataset_2/"
     #my_dataset_dir = "C:/gyani/Msc/BigData/A01_Datasets/A01_ex3_micro_dataset_3/"
 
-    if local_False_databricks_True == False:
-        my_dataset_dir = my_local_path + my_dataset_dir
-    else:
-        my_dataset_dir = my_databricks_path + my_dataset_dir
+    #if local_False_databricks_True == False:
+    #    my_dataset_dir = my_local_path + my_dataset_dir
+    #else:
+    #    my_dataset_dir = my_databricks_path + my_dataset_dir
 
     # 4. We configure the Spark Context
     sc = pyspark.SparkContext.getOrCreate()
