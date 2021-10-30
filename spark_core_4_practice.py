@@ -123,9 +123,10 @@ def my_main(sc,
                   .reduceByKey(lambda x,y: (x[0],x[1]+y[1]))\
 
 
-    solutionRDD = f5RDD.map(lambda row: (row[1][0],(row[0],row[1][1])))\
+    prenSolRDD = f5RDD.map(lambda row: (row[1][0],(row[0],row[1][1])))\
                        .sortByKey()
 
+    solutionRDD = prenSolRDD.map(lambda row:(row[0],row[1][0],row[1][1]))
 
     # ---------------------------------------
 
@@ -165,8 +166,8 @@ if __name__ == '__main__':
 
     my_dataset_dir = "A01_Datasets/my_dataset_complete/"
     #my_dataset_dir = "A01_Datasets/A01_ex4_micro_dataset_1/"
-    #my_dataset_dir = "C:/gyani/Msc/BigData/A01_Datasets/A01_ex4_micro_dataset_2/"
-    # my_dataset_dir = "C:/gyani/Msc/BigData/A01_Datasets/A01_ex4_micro_dataset_3/"
+    #my_dataset_dir = "A01_Datasets/A01_ex4_micro_dataset_2/"
+    #my_dataset_dir = "A01_Datasets/A01_ex4_micro_dataset_3/"
 
     # if local_False_databricks_True == False:
     #    my_dataset_dir = my_local_path + my_dataset_dir
