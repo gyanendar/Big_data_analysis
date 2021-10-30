@@ -18,6 +18,7 @@
 
 import pyspark
 import time
+import datetime
 
 # ------------------------------------------
 # FUNCTION process_line
@@ -58,31 +59,8 @@ def process_line(line):
     # 4. We return res
     return res
 
-def filter_function(para,day_picked,vehicle_id):
-    mylist = para.split(",")
 
-    if(int(mylist[7])!=vehicle_id):
-        return False
 
-    if(mylist[0][:10]!=day_picked):
-        return False
-    
-    if(mylist[9]=='0'):
-        return False
-
-    return True
-
-def store_req_data_function(para):
-    myList= para.split(",")
-
-    return ((myList[1],myList[8]),(myList[0][-8:],myList[1],myList[2],myList[6],myList[8]))
-
-def final_data_function(para,delay_limit):
-    val = para[1]
-    ontime = 0
-    if(abs(int(val[3]))<=delay_limit):
-        ontime = 1
-    return (int(val[1]),int(val[4]),val[0],ontime)
 # ------------------------------------------
 # FUNCTION my_main
 # ------------------------------------------
@@ -95,25 +73,41 @@ def my_main(sc,
 
     # 1. Operation C1: 'textFile'
     inputRDD = sc.textFile(my_dataset_dir)
-
-    f1RDD = inputRDD.filter(lambda x:filter_function(x,day_picked,vehicle_id))
-
-    f2RDD = f1RDD.map(store_req_data_function)
-
-    f3RDD = f2RDD.reduceByKey(lambda x,_:x)
-
-    f4RDD = f3RDD.map(lambda x:final_data_function(x,delay_limit))
-
-    f5RDD = f4RDD.sortBy(lambda x:x[2])
+    
     # ---------------------------------------
     # TO BE COMPLETED
     # ---------------------------------------
+    splitlineRDD = inputRDD.map(process_line)
+
+    filteredRDD = splitlineRDD.filter(lambda row: \
+                                row[7]== vehicle_id and\
+                                row[9]!= 0 and \
+                                row[0][:10]==day_picked)
+
+    timesortedRDD = filteredRDD.map(lambda row:(datetime.datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S"),row[1],row[6],row[8]))
+                               
+    
+    buslineStationIdRDD = timesortedRDD.map(lambda row: (\
+                                          (row[1],row[3]),\
+                                          (row[0],\
+                                           row[1],\
+                                           row[2],\
+                                           row[3])))
+
+    finaldatatoworkRDD = buslineStationIdRDD.reduceByKey(lambda row_1,row_2:row_1 if row_1[0]<row_2[0] else row_2 )\
+                               .map(lambda row:(row[1][0],row[1][1],row[1][2],row[1][3]))
+    timesortedfinalRDD = finaldatatoworkRDD.sortBy(lambda row:row[0])\
+                                           .map(lambda row: (row[1],row[3],row[0].strftime('%H:%M:%S'),row[2]))
+
+
+    solutionRDD = timesortedfinalRDD.map(lambda row: (row[0],row[1],row[2],1 if abs(row[3])<=abs(delay_limit) else 0))
     
 
     # ---------------------------------------
-
+    
     # Operation A1: 'collect'
-    resVAL = f5RDD.collect()
+    print(solutionRDD)
+    resVAL = solutionRDD.collect()   
     for item in resVAL:
         print(item)
 
@@ -144,8 +138,8 @@ if __name__ == '__main__':
     my_local_path = "../../../../3_Code_Examples/L07-23_Spark_Environment/"
     my_databricks_path = "/"
 
-    my_dataset_dir = "C:/gyani/Msc/BigData/A01_Datasets/my_dataset_complete/"
-    #my_dataset_dir = "C:/gyani/Msc/BigData/A01_Datasets/A01_ex2_micro_dataset_1/"
+    #my_dataset_dir = "C:/gyani/Msc/BigData/A01_Datasets/my_dataset_complete/"
+    my_dataset_dir = "C:/gyani/Msc/BigData/A01_Datasets/A01_ex2_micro_dataset_1/"
     #my_dataset_dir = "C:/gyani/Msc/BigData/A01_Datasets/A01_ex2_micro_dataset_2/"
     #my_dataset_dir = "FileStore/tables/6_Assignments/A01_ex2_micro_dataset_3/"
     
