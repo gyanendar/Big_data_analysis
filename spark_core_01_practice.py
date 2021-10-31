@@ -82,26 +82,28 @@ def my_main(sc,
     # 1. Operation C1: 'textFile'
     inputRDD = sc.textFile(my_dataset_dir)
 
-    rawRDD =inputRDD.map(process_line)
+    rawRDD = inputRDD.map(process_line)
 
     # ---------------------------------------
     # TO BE COMPLETED
     # ---------------------------------------
     #filter should be based on weekdays,time,latitude,longitudte range
-    f1RDD = rawRDD.filter(lambda row:south<=row[5]<=north and west<=row[4]<=east)\
+    filteredRDD = rawRDD.filter(lambda row:south<=row[5]<=north and west<=row[4]<=east)\
                   .filter(lambda row:filter_weekday_data(row[0],hours_list))
     # ---------------------------------------
-    f2RDD = f1RDD.map(lambda row: (datetime.datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S").strftime('%H'),row[3]))\
-                 .groupByKey()\
-                 .sortByKey(ascending=False)   
+    datatoworkRDD = filteredRDD.map(lambda row: \
+                       (datetime.datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S").strftime('%H'),row[3]))\
+                               .groupByKey()
 
-    f3RDD = f2RDD.map(lambda row:(row[0],list(row[1])))
+    hrsCongestionRDD = datatoworkRDD.map(lambda row:(row[0],list(row[1])))
     
-    solutionRDD = f3RDD.map(lambda row: \
+    solutionRDD = hrsCongestionRDD.map(lambda row: \
                             (row[0], \
                             round((row[1].count(1)/len(row[1]))*100,2),\
-                            len(row[1]),row[1].count(1)))
+                            len(row[1]),row[1].count(1)))\
+                           .sortBy(lambda row:row[1],ascending=False)
 
+    print(solutionRDD)
     # Operation A1: 'collect'
     resVAL = solutionRDD.collect()
     for item in resVAL:
@@ -136,8 +138,8 @@ if __name__ == '__main__':
     my_local_path = "../../../../3_Code_Examples/L07-23_Spark_Environment/"
     my_databricks_path = "/"
 
-    my_dataset_dir = "C:/gyani/Msc/BigData/A01_Datasets/my_dataset_complete/"
-    #my_dataset_dir = "C:/gyani/Msc/BigData/A01_Datasets/A01_ex1_micro_dataset_1/"
+    #my_dataset_dir = "C:/gyani/Msc/BigData/A01_Datasets/my_dataset_complete/"
+    my_dataset_dir = "C:/gyani/Msc/BigData/A01_Datasets/A01_ex1_micro_dataset_1/"
     #my_dataset_dir = "C:/gyani/Msc/BigData/A01_Datasets/A01_ex1_micro_dataset_2/"
     #my_dataset_dir = "C:/gyani/Msc/BigData/A01_Datasets/A01_ex1_micro_dataset_3/"
 
