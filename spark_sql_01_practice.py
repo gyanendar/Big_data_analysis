@@ -58,38 +58,38 @@ def my_main(spark,
     # TO BE COMPLETED
     # ---------------------------------------
     
-    
-    filteredDF = inputDF.select(f.col("*")).where((f.col("latitude") >= south) & \
+    #DO filtering based on latitude, longitude
+    # selected data should be from weekday
+    #
+    filteredDF = inputDF.select(f.substring("date",12,2).alias("hrs"),f.col("congestion")).where((f.col("latitude") >= south) & \
                                             (f.col("latitude")<=north) & \
                                             (f.col("longitude") >= west) & \
                                             (f.col("longitude")<=east) & \
                                             (f.dayofweek(f.col("date")) >1) & \
                                             (f.dayofweek(f.col("date")) <7))
 
-    
-    hrsCOlDF = filteredDF.withColumn("filter_hrs",f.substring("date",12,2))               
+    #Create new data frame for storing the hours list
+    hrs_listDF = spark.createDataFrame(map(lambda x:pyspark.sql.types.Row(x),hours_list),["hrsList"])
 
-    
-    # 2. Operation C1: Creation createDataFrame
-    hrs_listDF = spark.createDataFrame(map(lambda x:pyspark.sql.types.Row(x),hours_list),["hrs"])
-    filteredDF = hrsCOlDF.join(hrs_listDF,
-                              hrsCOlDF["filter_hrs"] == hrs_listDF["hrs"],
+    #doing join in hours to get rows for matching hrs
+    datatoworkDF = filteredDF.join(hrs_listDF,
+                              filteredDF["hrs"] == hrs_listDF["hrsList"],
                               "inner"
                               )
-    
-    q5DF = filteredDF.select(f.col("hrs").alias("hour"),f.col("congestion"),f.col("congestion").alias("cong"))
-    
-    q6DF = q5DF.groupBy(["hour"]).agg({"congestion":"sum","*":"count","cong":"avg"})\
+    #select required columns
+    finalDataDF = datatoworkDF.select(f.col("hrs").alias("hour"),f.col("congestion"),f.col("congestion").alias("cong"))
+
+    presolutionDF = finalDataDF.groupBy(["hour"]).agg({"congestion":"sum","*":"count","cong":"avg"})\
                                 .withColumnRenamed("count(1)", "numMeasurements")\
                                 .withColumnRenamed("sum(congestion)", "congestionMeasurements")\
-                                .withColumnRenamed("avg(cong)", "percentage")                                
-    
-    
-    solutionDF=   q6DF.select(f.col("hour"),\
+                                .withColumnRenamed("avg(cong)", "percentage")
+
+    solutionDF =   presolutionDF.select(f.col("hour"),\
                              (f.round(f.col("percentage")*100,2)).alias("percentage"),\
                               f.col("numMeasurements"),\
-                              f.col("congestionMeasurements")).orderBy(q6DF["percentage"].desc())                       
-                      
+                              f.col("congestionMeasurements")).orderBy(presolutionDF["percentage"].desc())                                   
+    
+               
     # ---------------------------------------
     
     # Operation A1: 'collect'
@@ -126,8 +126,8 @@ if __name__ == '__main__':
     my_local_path = "../../../../3_Code_Examples/L07-23_Spark_Environment/"
     my_databricks_path = "/"
 
-    #my_dataset_dir = "C:/gyani/Msc/BigData/A01_Datasets/my_dataset_complete/"
-    my_dataset_dir = "C:/gyani/Msc/BigData/A01_Datasets/A01_ex1_micro_dataset_1/"
+    my_dataset_dir = "C:/gyani/Msc/BigData/A01_Datasets/my_dataset_complete/"
+    #my_dataset_dir = "C:/gyani/Msc/BigData/A01_Datasets/A01_ex1_micro_dataset_1/"
     #my_dataset_dir = "C:/gyani/Msc/BigData/A01_Datasets/A01_ex1_micro_dataset_2/"
     #my_dataset_dir = "C:/gyani/Msc/BigData/A01_Datasets/A01_ex1_micro_dataset_3/"
 
